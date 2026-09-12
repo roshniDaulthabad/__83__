@@ -1,16 +1,64 @@
-# React + Vite
+# 🌡️ UDSS — Unified Decision Support System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> **Localized heat-risk intelligence for vulnerable communities.**
+>
+> UDSS combines real-time weather data, machine-learning temperature forecasting, thermal-stress analysis, and an interactive command-center dashboard to support heatwave preparedness and response.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚨 Overview
 
-## React Compiler
+**Unified Decision Support System (UDSS)** is a prototype decision-support platform designed to help authorities and emergency-response teams understand and act on localized heat stress.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The system combines:
 
-## Expanding the ESLint configuration
+- 🌦️ Real-time and forecast weather data
+- 🤖 Machine-learning temperature prediction
+- 🌡️ WBGT-based thermal-stress estimation
+- 🗺️ Interactive GIS visualization
+- 🏥 Health-risk decision support
+- ⚡ Power-grid vulnerability visualization
+- 🚑 Emergency action dispatch controls
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The pilot prototype focuses on **Yamnampet, Ghatkesar, Telangana**.
+
+---
+
+## 🎯 Problem
+
+Extreme heat can affect communities differently depending on:
+
+- Temperature
+- Humidity
+- Wind conditions
+- Solar radiation
+- Population vulnerability
+- Healthcare capacity
+- Electricity demand
+
+Traditional weather dashboards mainly show weather conditions. They do not provide a unified operational view connecting **weather → thermal stress → risk → response actions**.
+
+UDSS attempts to bridge this gap.
+
+---
+
+## 💡 Our Approach
+
+```text
+Weather Data
+     ↓
+Data Processing
+     ↓
+5-Day Historical Window
+     ↓
+Random Forest ML Model
+     ↓
+Tomorrow's Temperature Prediction
+     ↓
+Thermal Stress Calculation
+     ↓
+WBGT-Based Risk Classification
+     ↓
+UDSS Command Center
+     ↓
+Decision & Response Actions
