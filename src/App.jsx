@@ -10,24 +10,47 @@ function App() {
 
   const [liveData, setLiveData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const liveRisk =
-  liveData?.current?.risk ||
-  liveData?.thermal_stress?.risk ||
-  "LOW";
 
-const liveWBGT =
-  liveData?.current?.wbgt ??
-  liveData?.thermal_stress?.wbgt ??
-  cityStatus.avgWBGT;
+  // Live condition data: strictly uses live sensor readings
+  const currentRisk = liveData?.current?.risk || weatherData.riskLevel;
+  const tomorrowRisk = liveData?.thermal_stress?.risk || weatherData.riskLevel;
 
-const riskToAlert = (risk) => {
-  if (risk === "EXTREME RISK" || risk === "HIGH") return "RED";
-  if (risk === "MODERATE") return "YELLOW";
-  return "GREEN";
-};
+  const liveWBGT =
+    liveData?.current?.wbgt ??
+    weatherData.wbgt;
 
-const overviewAlert =
-  alertOverride || riskToAlert(liveRisk);
+  // Standardized 4-tier alert mapping: LOW -> GREEN, MODERATE -> YELLOW, HIGH -> ORANGE, EXTREME -> RED
+  const riskToAlert = (risk) => {
+    const value = String(risk || "").toUpperCase();
+    if (value.includes("EXTREME")) return "RED";
+    if (value.includes("HIGH")) return "ORANGE";
+    if (value.includes("MODERATE")) return "YELLOW";
+    return "GREEN";
+  };
+
+  const overviewAlert =
+    alertOverride || riskToAlert(currentRisk);
+
+  const formatPeakTime = (timeStr) => {
+    if (!timeStr) return "--";
+    try {
+      const match = String(timeStr).match(/(?:T|\s)(\d{1,2}):(\d{2})/);
+      if (match) {
+        const hour = parseInt(match[1], 10);
+        const min = match[2];
+        const ampm = hour >= 12 ? "PM" : "AM";
+        const hour12 = hour % 12 || 12;
+        return `${String(hour).padStart(2, "0")}:${min} (${hour12}:${min} ${ampm})`;
+      }
+      const date = new Date(timeStr);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+      }
+      return String(timeStr);
+    } catch {
+      return String(timeStr);
+    }
+  };
 
   /* ---------------------------------------------------------
      EXISTING API — DO NOT CHANGE
@@ -70,12 +93,8 @@ const overviewAlert =
      RISK
   --------------------------------------------------------- */
 
-  const currentRisk = liveData
-    ? liveData.thermal_stress?.risk
-    : weatherData.riskLevel;
-
   const getRiskClass = (risk) => {
-    const value = String(risk).toUpperCase();
+    const value = String(risk || "").toUpperCase();
 
     if (value.includes("EXTREME")) return "risk-red";
     if (value.includes("HIGH")) return "risk-orange";
@@ -85,7 +104,7 @@ const overviewAlert =
   };
 
   const getRiskLabel = (risk) => {
-    const value = String(risk).toUpperCase();
+    const value = String(risk || "").toUpperCase();
 
     if (value.includes("EXTREME")) return "EXTREME";
     if (value.includes("HIGH")) return "HIGH";
@@ -200,14 +219,15 @@ const overviewAlert =
           <div className="status-bar">
 
             <div className="status-item">
-  Area Status:{" "}
-  <span className={`alert ${overviewAlert.toLowerCase()}`}>
-    {overviewAlert}
-  </span>
-</div>
+              <span>Area Status</span>
+              <span className={`alert-pill ${overviewAlert.toLowerCase()}`}>
+                <span className="status-indicator-dot"></span>
+                {overviewAlert}
+              </span>
+            </div>
 
             <div className="status-item">
-              <span>Avg WBGT</span>
+              <span>Live WBGT</span>
               <strong>{Number(liveWBGT).toFixed(1)}°C</strong>
             </div>
 
@@ -215,6 +235,7 @@ const overviewAlert =
               <span>Projected Admissions (+3D)</span>
               <strong>
                 +{cityStatus.projectedAdmissions}
+                <small className="status-subtext">Demo Baseline</small>
               </strong>
             </div>
 
@@ -269,7 +290,7 @@ const overviewAlert =
 
                   <strong>Map Layers</strong>
 
-                  <label>
+                  <label className={activeLayer === "heat" ? "layer-label active" : "layer-label"}>
                     <input
                       type="radio"
                       name="layer"
@@ -279,7 +300,7 @@ const overviewAlert =
                     Ward Heat Index
                   </label>
 
-                  <label>
+                  <label className={activeLayer === "health" ? "layer-label active" : "layer-label"}>
                     <input
                       type="radio"
                       name="layer"
@@ -289,7 +310,7 @@ const overviewAlert =
                     Health Risk Overlay
                   </label>
 
-                  <label>
+                  <label className={activeLayer === "power" ? "layer-label active" : "layer-label"}>
                     <input
                       type="radio"
                       name="layer"
@@ -304,59 +325,159 @@ const overviewAlert =
 
                 <div className="map-box">
 
-                  {/* Real OpenStreetMap */}
+                  {/* Real OpenStreetMap Base */}
                   <iframe
                     title="Yamnampet Ghatkesar Map"
                     src="https://www.openstreetmap.org/export/embed.html?bbox=78.62%2C17.42%2C78.71%2C17.49&layer=mapnik&marker=17.4547%2C78.6611"
                     className="real-map"
                   />
 
-                  {/* Map overlay */}
-
+                  {/* Reactive Map Layer 1: Heat Index */}
                   {activeLayer === "heat" && (
-                    <div className="map-overlay heat-map-overlay">
-                      <span>HEAT STRESS MONITORING</span>
-                    </div>
+                    <>
+                      <div className="map-overlay heat-map-overlay">
+                        <div className="overlay-header">
+                          <span className="overlay-badge-dot heat"></span>
+                          <strong>WARD HEAT INDEX • PILOT SECTOR</strong>
+                        </div>
+                        <span className="overlay-sub">
+                          Live WBGT: {Number(liveWBGT).toFixed(1)}°C • Status: {getRiskLabel(currentRisk)}
+                        </span>
+                      </div>
+
+                      <div className={`map-visual-layer heat-layer ${getRiskClass(currentRisk)}`}>
+                        <div className="thermal-halo"></div>
+                        <div className="thermal-pulse"></div>
+                        <div className="sensor-marker-pin">
+                          <span className="sensor-pin-icon">📡</span>
+                          <span className="sensor-pin-label">
+                            Yamnampet AWS ({liveData ? `${liveData.current.temperature}°C` : `${weatherData.temperature}°C`})
+                          </span>
+                        </div>
+                      </div>
+                    </>
                   )}
 
+                  {/* Reactive Map Layer 2: Health Risk Overlay */}
                   {activeLayer === "health" && (
-                    <div className="map-overlay health-map-overlay">
-                      <span>HEALTH RISK OVERLAY</span>
-                    </div>
+                    <>
+                      <div className="map-overlay health-map-overlay">
+                        <div className="overlay-header">
+                          <span className="overlay-badge-dot health"></span>
+                          <strong>HEALTH SURVEILLANCE OVERLAY</strong>
+                        </div>
+                        <span className="overlay-sub">
+                          Prototype Facilities • Surge Buffer Zone
+                        </span>
+                      </div>
+
+                      <div className="map-visual-layer health-layer">
+                        <div className="facility-marker hospital-marker">
+                          <span className="facility-icon">🏥</span>
+                          <span className="facility-label">Ghatkesar PHC / Hospital</span>
+                        </div>
+                        <div className="facility-marker cooling-marker">
+                          <span className="facility-icon">❄️</span>
+                          <span className="facility-label">Designated Cooling Shelter</span>
+                        </div>
+                        <div className="vulnerability-zone"></div>
+                      </div>
+                    </>
                   )}
 
+                  {/* Reactive Map Layer 3: Power Grid Vulnerability */}
                   {activeLayer === "power" && (
-                    <div className="map-overlay power-map-overlay">
-                      <span>POWER GRID VULNERABILITY</span>
-                    </div>
+                    <>
+                      <div className="map-overlay power-map-overlay">
+                        <div className="overlay-header">
+                          <span className="overlay-badge-dot power"></span>
+                          <strong>POWER GRID VULNERABILITY</strong>
+                        </div>
+                        <span className="overlay-sub">
+                          Prototype Feeder Circuits • Peak Cooling Load
+                        </span>
+                      </div>
+
+                      <div className="map-visual-layer power-layer">
+                        <div className="facility-marker substation-marker">
+                          <span className="facility-icon">⚡</span>
+                          <span className="facility-label">Ghatkesar 33/11kV Substation</span>
+                        </div>
+                        <div className="feeder-circuit feeder-north"></div>
+                        <div className="feeder-circuit feeder-east"></div>
+                        <div className="grid-stress-zone"></div>
+                      </div>
+                    </>
                   )}
 
+                  {/* Pilot Area Location Marker */}
                   <div className="location-marker">
-                    <span>●</span>
+                    <span>📍</span>
                     <div>
                       <strong>Yamnampet</strong>
-                      <small>Ghatkesar</small>
+                      <small>Pilot Command Node</small>
                     </div>
                   </div>
 
+                  {/* Dynamic Map Legend */}
                   <div className="map-legend">
 
-                    <strong>MAP LEGEND</strong>
+                    <strong>
+                      {activeLayer === "heat" && "MAP LEGEND • HEAT INDEX"}
+                      {activeLayer === "health" && "MAP LEGEND • HEALTH OVERLAY"}
+                      {activeLayer === "power" && "MAP LEGEND • POWER GRID"}
+                    </strong>
 
-                    <div>
-                      <span className="legend-dot heat"></span>
-                      Heat Stress
-                    </div>
+                    {activeLayer === "heat" && (
+                      <>
+                        <div>
+                          <span className={`legend-dot ${getRiskClass(currentRisk)}`}></span>
+                          Thermal Stress Zone ({getRiskLabel(currentRisk)})
+                        </div>
+                        <div>
+                          <span className="legend-dot station"></span>
+                          Pilot AWS Sensor Station
+                        </div>
+                        <div>
+                          <span className="legend-dot hotspot"></span>
+                          Thermal Hotspot Radius
+                        </div>
+                      </>
+                    )}
 
-                    <div>
-                      <span className="legend-dot hospital"></span>
-                      Hospital
-                    </div>
+                    {activeLayer === "health" && (
+                      <>
+                        <div>
+                          <span className="legend-dot hospital"></span>
+                          Primary Health Centre (Ghatkesar)
+                        </div>
+                        <div>
+                          <span className="legend-dot cooling"></span>
+                          Designated Cooling Shelter
+                        </div>
+                        <div>
+                          <span className="legend-dot surge-zone"></span>
+                          Surge Vulnerability Sector (Demo)
+                        </div>
+                      </>
+                    )}
 
-                    <div>
-                      <span className="legend-dot cooling"></span>
-                      Cooling Center
-                    </div>
+                    {activeLayer === "power" && (
+                      <>
+                        <div>
+                          <span className="legend-dot substation"></span>
+                          33/11kV Distribution Substation
+                        </div>
+                        <div>
+                          <span className="legend-dot feeder"></span>
+                          High-Load Feeder Circuit
+                        </div>
+                        <div>
+                          <span className="legend-dot grid-alert"></span>
+                          Peak Load Stress Buffer (Demo)
+                        </div>
+                      </>
+                    )}
 
                   </div>
 
@@ -371,7 +492,12 @@ const overviewAlert =
 
                 <div className="card">
 
-                  <h3>METEOROLOGICAL ENGINE</h3>
+                  <div className="card-header-with-badge">
+                    <h3>METEOROLOGICAL ENGINE</h3>
+                    <span className="live-sensor-badge">
+                      <span className="live-dot"></span> LIVE TELEMETRY
+                    </span>
+                  </div>
 
                   <div className="metrics">
 
@@ -382,6 +508,7 @@ const overviewAlert =
                           ? `${liveData.current.temperature}°C`
                           : `${weatherData.temperature}°C`}
                       </strong>
+                      <small className="metric-tag">Station Sensor</small>
                     </div>
 
                     <div className="metric">
@@ -391,22 +518,25 @@ const overviewAlert =
                           ? `${liveData.current.humidity}%`
                           : `${weatherData.humidity}%`}
                       </strong>
+                      <small className="metric-tag">Relative 2m</small>
                     </div>
 
                     <div className="metric">
                       <span>Current WBGT</span>
                       <strong>
                         {liveData
-                          ? `${liveData.thermal_stress.wbgt}°C`
+                          ? `${liveData.current.wbgt}°C`
                           : `${weatherData.wbgt}°C`}
                       </strong>
+                      <small className="metric-tag">Live Sensor WBGT</small>
                     </div>
 
                     <div className="metric">
-                      <span>UTCI</span>
+                      <span>Est. UTCI</span>
                       <strong>
                         {weatherData.utci}°C
                       </strong>
+                      <small className="metric-tag">Biometeorology Model</small>
                     </div>
 
                   </div>
@@ -426,14 +556,14 @@ const overviewAlert =
 
                     <div className="risk-text">
 
-                      <span>THERMAL RISK</span>
+                      <span>THERMAL RISK (LIVE)</span>
 
                       <strong>
                         {getRiskLabel(currentRisk)}
                       </strong>
 
                       <small>
-                        Based on current conditions
+                        Calculated from live station conditions
                       </small>
 
                     </div>
@@ -475,9 +605,12 @@ const overviewAlert =
 
               {/* ML */}
 
-              <div className="card">
+              <div className="card ml-card">
 
-                <h3>ML TEMPERATURE PREDICTION</h3>
+                <div className="card-header-with-badge">
+                  <h3>ML TEMPERATURE PREDICTION</h3>
+                  <span className="ai-badge">AI FORECAST MODEL</span>
+                </div>
 
                 <div className="metrics">
 
@@ -489,6 +622,7 @@ const overviewAlert =
                         ? `${liveData.prediction.temperature}°C`
                         : "--"}
                     </strong>
+                    <small className="metric-tag">Random Forest Model</small>
                   </div>
 
                   <div className="metric">
@@ -499,6 +633,7 @@ const overviewAlert =
                         ? `${liveData.forecast.temperature}°C`
                         : "--"}
                     </strong>
+                    <small className="metric-tag">Meteo Daily Max</small>
                   </div>
 
                   <div className="metric">
@@ -509,6 +644,7 @@ const overviewAlert =
                         ? `${liveData.forecast.humidity}%`
                         : "--"}
                     </strong>
+                    <small className="metric-tag">At Peak Hour</small>
                   </div>
 
                 </div>
@@ -518,40 +654,46 @@ const overviewAlert =
 
               {/* TOMORROW */}
 
-              <div className="card">
+              <div className="card tomorrow-card">
 
-                <h3>TOMORROW THERMAL STRESS</h3>
+                <div className="card-header-with-badge">
+                  <h3>TOMORROW THERMAL STRESS</h3>
+                  <span className="forecast-badge">PEAK DAY FORECAST</span>
+                </div>
 
                 <div className="metrics">
 
                   <div className="metric">
-                    <span>Tomorrow WBGT</span>
+                    <span>Tomorrow Peak WBGT</span>
 
                     <strong>
                       {liveData
                         ? `${liveData.thermal_stress.wbgt}°C`
                         : "--"}
                     </strong>
+                    <small className="metric-tag">Peak Forecast</small>
                   </div>
 
                   <div className="metric">
                     <span>Risk Level</span>
 
                     <strong>
-                      {liveData
-                        ? liveData.thermal_stress.risk
-                        : weatherData.riskLevel}
+                      <span className={`risk-pill ${getRiskClass(tomorrowRisk)}`}>
+                        {getRiskLabel(tomorrowRisk)}
+                      </span>
                     </strong>
+                    <small className="metric-tag">NDMA Threshold</small>
                   </div>
 
                   <div className="metric">
                     <span>Peak Time</span>
 
                     <strong>
-                      {liveData
-                        ? liveData.peak_time
+                      {liveData?.forecast?.peak_time
+                        ? formatPeakTime(liveData.forecast.peak_time)
                         : "--"}
                     </strong>
+                    <small className="metric-tag">Peak Thermal Hour</small>
                   </div>
 
                 </div>
@@ -568,9 +710,17 @@ const overviewAlert =
               className="health-section"
             >
 
-              <div className="card">
+              <div className="card health-card">
 
-                <h3>HEALTH & SURGE PREDICTION</h3>
+                <div className="card-header-with-badge">
+                  <div>
+                    <h3>HEALTH SURVEILLANCE & SURGE BUFFER</h3>
+                    <span className="card-subheading">
+                      Pilot Reference Estimates (Demonstration Baseline)
+                    </span>
+                  </div>
+                  <span className="prototype-badge">DEMO PROJECTION BASELINE</span>
+                </div>
 
                 <div className="metrics">
 
@@ -579,6 +729,7 @@ const overviewAlert =
                     <strong>
                       {healthData.projectedICUDemand}%
                     </strong>
+                    <small className="metric-tag">Surge Estimate</small>
                   </div>
 
                   <div className="metric">
@@ -586,6 +737,7 @@ const overviewAlert =
                     <strong>
                       {healthData.erHeatstrokeLogs}
                     </strong>
+                    <small className="metric-tag">24h Surveillance Baseline</small>
                   </div>
 
                   <div className="metric">
@@ -593,6 +745,7 @@ const overviewAlert =
                     <strong>
                       {healthData.ambulanceAnomaly}%
                     </strong>
+                    <small className="metric-tag">Deviation Index</small>
                   </div>
 
                 </div>
@@ -623,63 +776,77 @@ const overviewAlert =
 
               <div className="card action-card">
 
-                <h3>ACTION DISPATCH MATRIX</h3>
+                <div className="card-header-with-badge">
+                  <h3>ACTION DISPATCH MATRIX</h3>
+                  <span className="command-badge">COMMAND ACTIONS</span>
+                </div>
 
                 <div className="actions">
 
-<button
-  onClick={() => {
-    setAlertOverride("RED");
-    handleAction("HAP Stage 2 activated");
-  }}
->
-  Trigger HAP Stage 2
-</button>
+                  <button
+                    className="action-btn-danger"
+                    onClick={() => {
+                      setAlertOverride("RED");
+                      handleAction("HAP Stage 2 activated — Emergency heat alert broadcast dispatched");
+                    }}
+                  >
+                    <span className="action-btn-icon">⚠️</span>
+                    Trigger HAP Stage 2
+                  </button>
 
                   <button
+                    className="action-btn-tactical"
                     onClick={() =>
                       handleAction(
-                        "IVR Broadcast queued — 1,240 users"
+                        "IVR Broadcast queued — 1,240 vulnerable users in Yamnampet sector"
                       )
                     }
                   >
+                    <span className="action-btn-icon">📢</span>
                     Send IVR Broadcast
                   </button>
 
                   <button
+                    className="action-btn-tactical"
                     onClick={() =>
                       handleAction(
-                        "47 ASHA field workers notified"
+                        "47 ASHA field workers notified in Ghatkesar cluster"
                       )
                     }
                   >
+                    <span className="action-btn-icon">👥</span>
                     Notify ASHA Network
                   </button>
 
                   <button
+                    className="action-btn-tactical"
                     onClick={() =>
                       handleAction(
-                        "Grid response request dispatched"
+                        "Grid response request dispatched — Substation load caps enabled"
                       )
                     }
                   >
+                    <span className="action-btn-icon">⚡</span>
                     Adjust Grid Caps
                   </button>
 
- <button
-  onClick={() => {
-    setAlertOverride(null);
-    setMessage("Alert level reset to live status");
-  }}
->
-  Reset Alert
-</button>
+                  <button
+                    className="action-btn-reset"
+                    onClick={() => {
+                      setAlertOverride(null);
+                      setMessage("Alert level reset to live station status");
+                    }}
+                  >
+                    <span className="action-btn-icon">↺</span>
+                    Reset Alert
+                  </button>
 
                 </div>
 
                 {message && (
                   <div className="action-message">
-                    {message}
+                    <span className="message-icon">✓</span>
+                    <span>{message}</span>
                   </div>
                 )}
 
